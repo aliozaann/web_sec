@@ -1,3 +1,8 @@
+Harika. Kali Linux ile tam uyumlu çalışması için gereken `httpx-toolkit` düzeltmesini ve dosya okuma hatalarını (No such file) tamamen ortadan kaldıran güvenli `wc -l` mantığını betiğine entegre ettim.
+
+Aşağıdaki kodların tamamını kopyalayıp dosyanın içine yapıştırabilirsin. Başka hiçbir ayar yapmana gerek yok.
+
+```bash
 #!/bin/bash
 
 # Renkler
@@ -70,11 +75,11 @@ current_step=0
 ((current_step++))
 show_progress $current_step $total_steps "Wayback Machine taranıyor..."
 curl -s "http://web.archive.org/cdx/search/cdx?url=*.$domain/*&output=text&fl=original&collapse=urlkey" | sort -u > $WAYBACK_URLS
-wayback_url_count=$(wc -l < $WAYBACK_URLS 2>/dev/null || echo "0")
+wayback_url_count=$(cat $WAYBACK_URLS 2>/dev/null | wc -l)
 
 if [ $wayback_url_count -gt 0 ]; then
     cat $WAYBACK_URLS | grep -oE "https?://[^/]*" | sed -E 's#https?://##' | sed 's/:.*//' | grep -E "\.$domain$" | sort -u > $WAYBACK_SUBS
-    wayback_sub_count=$(wc -l < $WAYBACK_SUBS)
+    wayback_sub_count=$(cat $WAYBACK_SUBS 2>/dev/null | wc -l)
     echo -e "${GREEN}   ├─ $wayback_url_count URL bulundu.${NC}"
     echo -e "${GREEN}   └─ $wayback_sub_count benzersiz subdomain çıkarıldı.${NC}"
 else
@@ -88,7 +93,7 @@ fi
 ((current_step++))
 show_progress $current_step $total_steps "crt.sh (Sertifika Şeffaflığı) sorgulanıyor..."
 curl -s "https://crt.sh/?q=%25.$domain&output=json" | jq -r '.[].name_value' 2>/dev/null | sed 's/\*\.//g' | sort -u > $CRTSH
-crtsh_count=$(wc -l < $CRTSH 2>/dev/null || echo "0")
+crtsh_count=$(cat $CRTSH 2>/dev/null | wc -l)
 echo -e "${GREEN}   └─ $crtsh_count subdomain bulundu.${NC}"
 
 #---------------------------------------------------------------------
@@ -102,7 +107,7 @@ done
 
 if [ -s $TEMP_DIR/commoncrawl_raw.txt ]; then
     cat $TEMP_DIR/commoncrawl_raw.txt | grep -oE "https?://[^/]*" | sed -E 's#https?://##' | sed 's/:.*//' | grep -E "\.$domain$" | sort -u > $COMMONCRAWL
-    commoncrawl_count=$(wc -l < $COMMONCRAWL)
+    commoncrawl_count=$(cat $COMMONCRAWL 2>/dev/null | wc -l)
     echo -e "${GREEN}   └─ $commoncrawl_count subdomain bulundu.${NC}"
 else
     touch $COMMONCRAWL
@@ -115,7 +120,7 @@ fi
 ((current_step++))
 show_progress $current_step $total_steps "AlienVault OTX sorgulanıyor..."
 curl -s "https://otx.alienvault.com/api/v1/indicators/domain/$domain/passive_dns" | jq -r '.passive_dns[]?.hostname' 2>/dev/null | grep -E "\.$domain$" | sort -u > $ALIENVAULT
-alienvault_count=$(wc -l < $ALIENVAULT 2>/dev/null || echo "0")
+alienvault_count=$(cat $ALIENVAULT 2>/dev/null | wc -l)
 echo -e "${GREEN}   └─ $alienvault_count subdomain bulundu.${NC}"
 
 #---------------------------------------------------------------------
@@ -124,7 +129,7 @@ echo -e "${GREEN}   └─ $alienvault_count subdomain bulundu.${NC}"
 ((current_step++))
 show_progress $current_step $total_steps "RapidDNS sorgulanıyor..."
 curl -s "https://rapiddns.io/subdomain/$domain?full=1" | grep -oE "[a-zA-Z0-9.-]+\.$domain" | sort -u > $RAPIDDNS
-rapiddns_count=$(wc -l < $RAPIDDNS 2>/dev/null || echo "0")
+rapiddns_count=$(cat $RAPIDDNS 2>/dev/null | wc -l)
 echo -e "${GREEN}   └─ $rapiddns_count subdomain bulundu.${NC}"
 
 #---------------------------------------------------------------------
@@ -133,7 +138,7 @@ echo -e "${GREEN}   └─ $rapiddns_count subdomain bulundu.${NC}"
 ((current_step++))
 show_progress $current_step $total_steps "URLScan.io sorgulanıyor..."
 curl -s "https://urlscan.io/api/v1/search/?q=domain:$domain&size=10000" | jq -r '.results[]?.page?.domain' 2>/dev/null | grep -E "\.$domain$" | sort -u > $URLSCAN
-urlscan_count=$(wc -l < $URLSCAN 2>/dev/null || echo "0")
+urlscan_count=$(cat $URLSCAN 2>/dev/null | wc -l)
 echo -e "${GREEN}   └─ $urlscan_count subdomain bulundu.${NC}"
 
 #---------------------------------------------------------------------
@@ -142,7 +147,7 @@ echo -e "${GREEN}   └─ $urlscan_count subdomain bulundu.${NC}"
 ((current_step++))
 show_progress $current_step $total_steps "Subfinder çalıştırılıyor..."
 subfinder -d $domain -silent -all -recursive | sort -u > $SUBFINDER
-subfinder_count=$(wc -l < $SUBFINDER 2>/dev/null || echo "0")
+subfinder_count=$(cat $SUBFINDER 2>/dev/null | wc -l)
 echo -e "${GREEN}   └─ $subfinder_count subdomain bulundu.${NC}"
 
 #---------------------------------------------------------------------
@@ -154,7 +159,7 @@ cat $WAYBACK_SUBS $CRTSH $COMMONCRAWL $ALIENVAULT $RAPIDDNS $URLSCAN $SUBFINDER 
     grep -v "^$" | \
     grep -E "^[a-zA-Z0-9.-]+\.$domain$" | \
     sort -u > $ALL_SUBS
-total_count=$(wc -l < $ALL_SUBS)
+total_count=$(cat $ALL_SUBS 2>/dev/null | wc -l)
 
 if [ $total_count -eq 0 ]; then
     echo -e "${RED}[!] Hiç subdomain bulunamadı.${NC}"
@@ -164,21 +169,22 @@ fi
 echo -e "${GREEN}   └─ Toplam $total_count benzersiz subdomain listelendi.${NC}"
 
 #---------------------------------------------------------------------
-# 9. AKTİFLİK KONTROLÜ (httpx)
+# 9. AKTİFLİK KONTROLÜ (httpx-toolkit)
 #---------------------------------------------------------------------
 ((current_step++))
 show_progress $current_step $total_steps "HTTPX ile aktiflik kontrolü yapılıyor..."
-if command -v httpx &> /dev/null; then
-    httpx -l $ALL_SUBS -silent -threads 100 -o $ACTIVE_SUBS
-    active_count=$(wc -l < $ACTIVE_SUBS 2>/dev/null || echo "0")
+if command -v httpx-toolkit &> /dev/null; then
+    httpx-toolkit -l $ALL_SUBS -silent -threads 100 -o $ACTIVE_SUBS
+    active_count=$(cat $ACTIVE_SUBS 2>/dev/null | wc -l)
     
     # Status 200 Analizi
-    httpx -l $ACTIVE_SUBS -mc 200 -sc -ip -title -server -tech-detect -silent -threads 100 -o $FINAL
-    status_200_count=$(wc -l < $FINAL 2>/dev/null || echo "0")
+    httpx-toolkit -l $ACTIVE_SUBS -mc 200 -sc -ip -title -server -tech-detect -silent -threads 100 -o $FINAL
+    status_200_count=$(cat $FINAL 2>/dev/null | wc -l)
+    
     echo -e "${GREEN}   ├─ $active_count aktif subdomain tespit edildi.${NC}"
     echo -e "${GREEN}   └─ $status_200_count site '200 OK' döndürüyor.${NC}"
 else
-    echo -e "${YELLOW}   └─ httpx kurulu değil, aktiflik kontrolü atlanıyor.${NC}"
+    echo -e "${YELLOW}   └─ httpx-toolkit kurulu değil, aktiflik kontrolü atlanıyor.${NC}"
     active_count="N/A"
     status_200_count="N/A"
 fi
@@ -196,7 +202,7 @@ show_progress $current_step $total_steps "Rapor oluşturuluyor..."
     echo -e "Tarih    : $(date)"
     echo -e "------------------------------"
     echo -e "Kaynaklar:"
-    echo -e "  Wayback     : $(wc -l < $WAYBACK_SUBS 2>/dev/null || echo 0)"
+    echo -e "  Wayback     : $(cat $WAYBACK_SUBS 2>/dev/null | wc -l)"
     echo -e "  crt.sh      : $crtsh_count"
     echo -e "  Subfinder   : $subfinder_count"
     echo -e "  AlienVault  : $alienvault_count"
@@ -218,3 +224,5 @@ echo -e "${BLUE}═════════════════════�
 # Temizlik
 rm -rf $TEMP_DIR
 echo -e "${GREEN}İşlem başarıyla tamamlandı.${NC}"
+
+```

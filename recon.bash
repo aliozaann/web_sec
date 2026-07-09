@@ -1,8 +1,4 @@
-Harika. Kali Linux ile tam uyumlu çalışması için gereken `httpx-toolkit` düzeltmesini ve dosya okuma hatalarını (No such file) tamamen ortadan kaldıran güvenli `wc -l` mantığını betiğine entegre ettim.
 
-Aşağıdaki kodların tamamını kopyalayıp dosyanın içine yapıştırabilirsin. Başka hiçbir ayar yapmana gerek yok.
-
-```bash
 #!/bin/bash
 
 # Renkler
